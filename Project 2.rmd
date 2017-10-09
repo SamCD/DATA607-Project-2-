@@ -1,0 +1,104 @@
+---
+title: "Project 2"
+author: "Sam CD"
+date: "October 8, 2017"
+output: html_document
+---
+```{r,echo=FALSE}
+library(dplyr)
+library(tidyr)
+library(RCurl)
+library(reshape2)
+```
+#Humanitarian data (from Sam C-D)
+```{r,echo=TRUE}
+#Load the file from local location (the header line is repeated, so some extra work is needed before
+# loading the csv)
+
+file <- "/Users/samdevries/Downloads/OP3_DANA_EN.xlsx - DANA.csv"
+headers = read.csv(file, skip = 0, header = F, nrows = 1, as.is = T)
+df = read.csv(file, skip = 3, header = F)
+colnames(df)= headers
+
+df$iso = paste(df$iso2,df$iso3)
+
+#cleaning up the data by focusing on columns dealing with property destruction
+destruct <-
+df %>%
+  gather(cat,total,ends_with("_destroyed"),ends_with("_affected"),-iso) %>%
+  select(iso,cat,total)
+
+destruct_byCat <-
+  destruct %>%
+  separate(cat,into=c("cat1","cat2"),sep="_")
+
+#getting a breakdown by region
+destruct_byCat %>%
+  group_by(iso,cat2) %>%
+  summarise(
+    total = n()
+    )
+
+#a by region analysis of total numbers of deceased, missing, etc. I chose to order by the number 
+# in shelters as this might provide a relevant real-world value. Given these numbers, it might be
+# helpful for an organization to have numbers like the total number of shelters and capactiy in a region
+byIso <- df %>% group_by(iso) 
+byIso %>% 
+  summarise(
+  dec = sum(dead_total),
+  miss = sum(missing_total),
+  ref = sum(refugees_total),
+  disp = sum(displaced_total),
+  shel = sum(in_shelter_total),
+  aff = sum(affected_total)
+  ) %>%
+  arrange(desc(shel))
+```
+
+#Drug use by age (from Michael D)
+```{r}
+x <- getURL("https://raw.githubusercontent.com/fivethirtyeight/data/master/drug-use-by-age/drug-use-by-age.csv")
+y <- read.csv(text = x)
+use <-
+y %>%
+  gather(cat,val,ends_with(".use"),-age, -n) %>%
+  select(age,n,cat,val)
+freq <-
+y %>%
+  gather(cat,val,ends_with("frequency"),-age, -n) %>%
+  select(age,n,cat,val)
+
+#see the most commonly used substances
+use %>%
+  group_by(age) %>%
+  filter(val==max(val)) %>%
+  arrange(age)
+#see the most frequently used substances
+freq %>%
+  group_by(age) %>%
+  filter(val==max(val)) %>%
+  arrange(age)
+
+#performing the analysis from the discussion question (using the age as columns)
+dcast(use, cat ~ age)
+```
+
+#College Scorecard (from Joshua S.)
+```{r}
+x2 <- getURL("https://ed-public-download.app.cloud.gov/downloads/Most-Recent-Cohorts-Scorecard-Elements.csv")
+y2 <- read.csv(text = x2,na.strings=c("NULL"))
+
+#combining similar columns; the columns beginning with UGDS refer to ethnicity breakdowns
+df <- y2 %>%
+  gather(cat,val,starts_with("UGDS"), -INSTNM, -STABBR) %>%
+  select(INSTNM,STABBR,cat,val) %>%
+  #removing the "total undergrads" fields
+  filter(cat != "UGDS") %>%
+  separate(cat,into=c("student.type","ethnicity"),sep="_")
+
+#analysis of ethnicity by state, showing institutions with the highest concentrations of each category
+df %>%
+  group_by(ethnicity,STABBR) %>%
+  filter(val == max(val)) %>%
+  arrange(STABBR)
+```
